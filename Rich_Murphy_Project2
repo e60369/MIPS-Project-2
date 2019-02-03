@@ -1,0 +1,67 @@
+# main source file
+
+.org 0x10000000
+
+#### Initialization/assignment of registers $t0 - $t5 ####
+li $t0, 0xf0100000 # Assign the switches to register $t0.
+li $t1, 0xf0200000 # Assign the LED's to register $t1.
+li $t2, 0x00000001 # Initialize the register with a value that will trigger all lights to blink if switches match it.
+li $t3, 0x00000002 # Initialize the register with a value that will trigger the even lights to blink if switches match it.
+li $t4, 0x00000004 # Initialize the register with a value that will trigger the odd lights to blink if switches match it.
+li $t5, 0x00000008 # Initialize the register with a value that will trigger the runway lights if switches match it.
+
+#### This label detects the switch position and loads it into register $t6. It also blinks the lights (sort of) ####
+read_switches:
+	li $t6, 0x00000000 # Initializes a value of 0 in the $t6 register to effectively reset it for each new reading.
+	sw $t6, 0($t1) # Writes the 0 from previous line into the LED's to turn them off on each read cycle. This is where the blinking comes from.
+	lw $t6, 0($t0) # load switch value back into register $t6.
+
+#### These are our branching statements which test for one of five different coniditions and then determine a lighting pattern as a result. ####
+beq $t6 $t2 all_blink # Compares switch position with register $t2, if true, goto all_blink label.
+nop
+beq $t6 $t3 even_blink # Compares switch position with register $t3, if true, goto the even_blink label.
+nop
+beq $t6 $t4 odd_blink # Compares switch position with register $t4, if true, goto the odd_blink label.
+nop
+beq $t6 $t5 runway_lights # Compares switch position with register $t5, if true, goto the runway_lights label.
+nop
+bne $t6 $t5 no_lights # Jumps to a loop which just reads the switch positions and never lights any of the LED's if no other conditions are met.
+nop
+
+#### Makes all the LEDs blink ####
+all_blink:
+	li $t6, 0x000000ff # Load the HEX value that will make all the LEDs turn on into $t6.
+	sw $t6, 0($t1) # Write $t6 to the LEDs.
+j read_switches # Go back and read the switches again to see if the state has changed.
+nop
+
+#### Makes all the even LEDs blink ####
+even_blink:
+	li $t6, 0x00000055 # Load the HEX value that will make all the even LEDs turn on into $t6.
+	sw $t6, 0($t1) # Write $t6 to the LEDs.
+j read_switches # Go back and read the switches again to see if the state has changed.
+nop
+
+#### Makes all the odd LEDs blink ####
+odd_blink:
+	li $t6, 0x000000aa # Load the HEX value that will make all the odd LEDs turn on into $t6.
+	sw $t6, 0($t1) # Write $t6 to the LEDs.
+j read_switches # Go back and read the switches again to see if the state has changed.
+nop
+
+#### Makes the LEDs perform a scrolling (runway lights) pattern ####
+runway_lights:
+	li $t6, 0x00000001 # Initialize $t6 with a 1 so that the first LED will light up when shift_left first executes.
+	li $t7, 0x00000080 # This is the maximum value that we will want our shift function to reach (2^7=128 or 80hex).
+		shift_left:
+		sw $t6, 0($t1) # Write $t6 to the LEDs.
+		sll $t6, $t6, 1 # Shifts $t6 one position the left. 
+	bne $t6, $t7 shift_left # Goto to the shift_left label and iterate until $t6 hits the max value of 80hex.
+	sw $t6, 0($t1) # Branch delay slot that writes the newly shifted value in $t6 to the LEDs.
+j read_switches # Go back and read the switches again to see if the state has changed.
+nop
+
+#### This initiates a loop whereby if none of the other conditions are met no lights will blink. ####
+no_lights:
+j read_switches # Go back and read the switches again to see if the state has changed.
+nop
